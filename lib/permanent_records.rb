@@ -1,71 +1,35 @@
+require 'active_record'
+
 module PermanentRecords
   def self.included(base)
-    if base.respond_to?(:named_scope)
-      base.named_scope :deleted, :conditions => 'deleted_at IS NOT NULL'
-      base.named_scope :not_deleted, :conditions => { :deleted_at => nil }
-    else
-      base.extend LegacyScopes
-    end
-    base.send :include, InstanceMethods
     base.instance_eval do
-      define_callbacks :before_revive, :after_revive
-      alias_method_chain :destroy, :permanent_record_force
-      alias_method_chain :destroy_without_callbacks, :permanent_record
-      before_revive :revive_destroyed_dependent_records
       def is_permanent?
         columns.detect {|c| 'deleted_at' == c.name}
       end
-    end
-  end
-  
-  module LegacyScopes
-    def with_deleted
-      with_scope :find => {:conditions => "#{quoted_table_name}.deleted_at IS NOT NULL"} do
-        yield
-      end
-    end
-    
-    def with_not_deleted
-      with_scope :find => {:conditions => "#{quoted_table_name}.deleted_at IS NULL"} do
-        yield
-      end
-    end
-    
-    # this next bit is basically stolen from the scope_out plugin
-    [:deleted, :not_deleted].each do |name|
-      define_method "find_#{name}" do |*args|
-        send("with_#{name}") { find(*args) }
+
+      def deleted
+        unscoped.where( 'deleted_at IS NOT NULL' )
       end
 
-      define_method "count_#{name}" do |*args|
-        send("with_#{name}") { count(*args) }
+      def not_deleted
+        unscoped.where( :deleted_at => nil )
       end
 
-      define_method "calculate_#{name}" do |*args|
-        send("with_#{name}") { calculate(*args) }
-      end
-
-      define_method "find_all_#{name}" do |*args|
-        send("with_#{name}") { find(:all, *args) }
+      def with_deleted
+        unscoped
       end
     end
+
+    base.send :include, InstanceMethods
   end
   
   module InstanceMethods
-    
     def is_permanent?
       respond_to?(:deleted_at)
     end
     
     def deleted?
       deleted_at if is_permanent?
-    end
-    
-    def revive
-      run_callbacks :before_revive
-      set_deleted_at nil
-      run_callbacks :after_revive
-      self
     end
     
     def set_deleted_at(value)
@@ -75,41 +39,17 @@ module PermanentRecords
       @attributes, @attributes_cache = record.attributes, record.attributes
     end
     
-    def destroy_with_permanent_record_force(force = nil)
-      @force_permanent_record_destroy = (:force == force)
-      destroy_without_permanent_record_force
-    end
-    
-    def destroy_without_callbacks_with_permanent_record
-      return destroy_without_callbacks_without_permanent_record if @force_permanent_record_destroy || !is_permanent?
-      unless deleted? || new_record?
-        set_deleted_at Time.now
+    def destroy(force = nil)
+      if !is_permanent? || force == :force
+        return super()
+      elsif persisted? && !deleted?
+        run_callbacks :destroy do 
+          set_deleted_at Time.now.utc
+        end
       end
       self
     end
-
-    def revive_destroyed_dependent_records
-      self.class.reflections.select do |name, reflection|
-        'destroy' == reflection.options[:dependent].to_s && reflection.klass.is_permanent?
-      end.each do |name, reflection|
-
-        send(name).find(:all,
-                        :conditions => [
-                          "#{reflection.quoted_table_name}.deleted_at > ?" +
-                          " AND " +
-                          "#{reflection.quoted_table_name}.deleted_at < ?",
-                          deleted_at - 3.seconds,
-                          deleted_at + 3.seconds
-                        ]
-                      ).each do |dependent|
-          dependent.revive
-        end
-
-        # and update the reflection cache
-        send(name, :reload)
-      end
-    end
   end
 end
-ActiveRecord::Base.send :include, PermanentRecords
 
+ActiveRecord::Base.send :include, PermanentRecords

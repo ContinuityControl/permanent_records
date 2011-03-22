@@ -29,11 +29,6 @@ class PermanentRecordsTest < ActiveSupport::TestCase
     assert_equal muskrat, muskrat.destroy
   end
   
-  def test_revive_should_return_the_record
-    muskrat = @deleted
-    assert_equal muskrat, muskrat.revive
-  end
-
   def test_destroy_should_set_deleted_at_attribute
     assert @active.destroy.deleted_at
   end
@@ -54,29 +49,12 @@ class PermanentRecordsTest < ActiveSupport::TestCase
     assert Muskrat.find(@active.destroy(:hula_dancer).id)
   end
   
-  def test_revive_should_unfreeze_record
-    assert !@deleted.revive.frozen?
-  end
-  
-  def test_revive_should_unset_deleted_at
-    assert !@deleted.revive.deleted_at
-  end
-  
-  def test_revive_should_make_deleted_return_false
-    assert !@deleted.revive.deleted?
-  end
-  
   def test_deleted_returns_true_for_deleted_records
     assert @deleted.deleted?
   end
   
   def test_destroy_returns_record_with_modified_attributes
     assert @active.destroy.deleted?
-  end
-  
-  def test_revive_and_destroy_should_be_chainable
-    assert @active.destroy.revive.destroy.destroy.revive.revive.destroy.deleted?
-    assert !@deleted.destroy.revive.revive.destroy.destroy.revive.deleted?
   end
   
   def test_with_counting_on_deleted_limits_scope_to_count_deleted_records
@@ -118,19 +96,4 @@ class PermanentRecordsTest < ActiveSupport::TestCase
     assert @hole.muskrats.first.deleted?
   end
   
-  def test_dependent_permanent_records_should_be_revived_when_parent_is_revived
-    assert @hole.is_permanent?
-    @hole.destroy
-    assert @hole.muskrats.find_by_name("Active Muskrat").deleted?
-    @hole.revive
-    assert !@hole.muskrats.find_by_name("Active Muskrat").deleted?
-  end
-  
-  def test_old_dependent_permanent_records_should_not_be_revived
-    assert @hole.is_permanent?
-    @hole.destroy
-    assert @hole.muskrats.find_by_name("Deleted Muskrat").deleted?
-    @hole.revive
-    assert @hole.muskrats.find_by_name("Deleted Muskrat").deleted?
-  end
 end
