@@ -10,6 +10,7 @@ begin
     gem.email = "gems@6brand.com"
     gem.homepage = "http://github.com/JackDanger/permanent_records"
     gem.authors = ["Jack Danger Canty"]
+    gem.version = 1.2
   end
 rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
