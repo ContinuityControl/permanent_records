@@ -40,14 +40,17 @@ module PermanentRecords
     end
     
     def destroy(force = nil)
+      require 'ruby-debug'; debugger
       if !is_permanent? || force == :force
-        return super()
+        super()
       elsif persisted? && !deleted?
         run_callbacks :destroy do 
           set_deleted_at Time.now.utc
+          freeze
         end
+      else
+        freeze
       end
-      self
     end
   end
 end
