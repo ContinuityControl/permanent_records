@@ -40,7 +40,6 @@ module PermanentRecords
     end
     
     def destroy(force = nil)
-      require 'ruby-debug'; debugger
       if !is_permanent? || force == :force
         super()
       elsif persisted? && !deleted?
