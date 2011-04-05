@@ -34,7 +34,7 @@ module PermanentRecords
     
     def set_deleted_at(value)
       return self unless is_permanent?
-      record = self.class.find(id)
+      record = self.class.unscoped.find(id)
       record.update_attribute(:deleted_at, value)
       @attributes, @attributes_cache = record.attributes, record.attributes
     end
@@ -42,13 +42,12 @@ module PermanentRecords
     def destroy(force = nil)
       if !is_permanent? || force == :force
         super()
-      elsif persisted? && !deleted?
+      elsif persisted? && !deleted? && !destroyed?
         run_callbacks :destroy do 
           set_deleted_at Time.now.utc
+          @destroyed = true
           freeze
         end
-      else
-        freeze
       end
     end
   end
